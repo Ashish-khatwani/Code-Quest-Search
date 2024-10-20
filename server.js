@@ -11,7 +11,6 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static('public'));
 
-// Function to fetch top answers from Stack Overflow
 const fetchStackOverflowAnswers = async (questionId) => {
     try {
         const response = await axios.get(`https://api.stackexchange.com/2.3/questions/${questionId}/answers`, {
@@ -19,13 +18,35 @@ const fetchStackOverflowAnswers = async (questionId) => {
                 order: 'desc',
                 sort: 'votes',
                 site: 'stackoverflow',
-                filter: '!9_bDE(fI5' // A custom filter to limit fields
+                filter: '!9_bDE(fI5'
             }
         });
         return response.data.items.map(answer => answer.body).slice(0, 3); // Get top 3 answers
     } catch (error) {
         console.error('Error fetching Stack Overflow answers:', error);
         return [];
+    }
+};
+
+const fetchRedditTopComments = async (postId) => {
+    try {
+        const response = await axios.get(`https://www.reddit.com/comments/${postId}.json`);
+        // Check if response data exists and has the second element
+        if (response.data && response.data[1] && response.data[1].data && response.data[1].data.children) {
+            const comments = response.data[1].data.children;
+            return comments.slice(0, 3).map(comment => {
+                const body = comment.data.body;
+                // Truncate comment to the first 300 characters or less
+                const truncatedBody = body.length > 300 ? body.slice(0, 300) + '...' : body;
+                return truncatedBody; // Return truncated comment
+            });
+        } else {
+            console.error('Unexpected Reddit API response structure:', response.data);
+            return ['No comments available.'];
+        }
+    } catch (error) {
+        console.error('Error fetching Reddit comments:', error);
+        return ['Error fetching comments.'];
     }
 };
 
@@ -88,18 +109,6 @@ app.get('/api/reddit', async (req, res) => {
     }
 });
 
-// Function to fetch top comments from a Reddit post
-const fetchRedditTopComments = async (postId) => {
-    try {
-        const response = await axios.get(`https://www.reddit.com/comments/${postId}.json`);
-        const comments = response.data[1].data.children;
-        return comments.slice(0, 3).map(comment => comment.data.body); // Get top 3 comments
-    } catch (error) {
-        console.error('Error fetching Reddit comments:', error);
-        return [];
-    }
-};
-
 app.post('/api/send-email', async (req, res) => {
     const { email, results } = req.body;
 
@@ -122,6 +131,7 @@ app.post('/api/send-email', async (req, res) => {
         await transporter.sendMail(mailOptions);
         res.json({ message: 'Email sent successfully' });
     } catch (error) {
+        console.error('Error sending email:', error);
         res.status(500).json({ error: 'Error sending email' });
     }
 });
