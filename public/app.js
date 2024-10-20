@@ -55,6 +55,7 @@ searchButton.addEventListener('click', async () => {
 });
 
 // Function to display results
+// Function to display results
 function displayResults(results) {
     resultsContainer.innerHTML = ''; // Clear previous results
     if (results.length === 0) {
@@ -67,20 +68,36 @@ function displayResults(results) {
         resultElement.classList.add('result-item');
 
         const title = result.title || 'No Title';
-        const url = result.link || (result.url || ''); // Check for link in Stack Overflow or url in Reddit
+        const url = result.link || (result.url || ''); // URL for Stack Overflow or Reddit
+        const summary = result.summary || result.selftext || ''; // Summary for Reddit or additional data for Stack Overflow
+        const topAnswers = result.top_answers || []; // Assuming you have a way to get top answers from your data
 
+        // Building result display
         resultElement.innerHTML = `
-            <h3>${title}</h3>
-            <p><a href="${url}" target="_blank">${url}</a></p>
+            <h3><a href="${url}" target="_blank">${title}</a></h3>
+            <p>${summary}</p>
+        `;
+
+        // Only add Top Answers section if there are top answers available
+        if (topAnswers.length > 0) {
+            resultElement.innerHTML += `<p><strong>Top Answers:</strong></p>
+                <ul>
+                    ${topAnswers.slice(0, 3).map(answer => `<li>${answer}</li>`).join('')}
+                </ul>`;
+        }
+
+        // Append upvotes and comments info
+        resultElement.innerHTML += `
             <p><strong>Upvotes:</strong> ${result.ups || 0} | <strong>Comments:</strong> ${result.num_comments || 0}</p>
         `;
-        
+
         resultsContainer.appendChild(resultElement);
     });
 
     // Show the email section
     document.getElementById('emailSection').style.display = 'block';
 }
+
 
 // Clear button functionality
 clearButton.addEventListener('click', () => {

@@ -11,7 +11,24 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static('public'));
 
-// Endpoint to fetch results from Stack Overflow
+// Function to fetch top answers from Stack Overflow
+const fetchStackOverflowAnswers = async (questionId) => {
+    try {
+        const response = await axios.get(`https://api.stackexchange.com/2.3/questions/${questionId}/answers`, {
+            params: {
+                order: 'desc',
+                sort: 'votes',
+                site: 'stackoverflow',
+                filter: '!9_bDE(fI5' // A custom filter to limit fields
+            }
+        });
+        return response.data.items.map(answer => answer.body).slice(0, 3); // Get top 3 answers
+    } catch (error) {
+        console.error('Error fetching Stack Overflow answers:', error);
+        return [];
+    }
+};
+
 app.get('/api/stackoverflow', async (req, res) => {
     const query = req.query.q;
     try {
@@ -23,33 +40,66 @@ app.get('/api/stackoverflow', async (req, res) => {
                 site: 'stackoverflow'
             }
         });
-        res.json(response.data.items);
+        
+        const results = await Promise.all(response.data.items.map(async item => {
+            const topAnswers = await fetchStackOverflowAnswers(item.question_id);
+            return {
+                title: item.title,
+                link: item.link,
+                summary: item.body || 'No summary available.',
+                ups: item.score, // Using score as upvotes
+                num_comments: item.answer_count, // Using answer_count as comments
+                top_answers: topAnswers
+            };
+        }));
+
+        res.json(results);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching from Stack Overflow' });
     }
 });
 
-// Endpoint to fetch results from Reddit
 app.get('/api/reddit', async (req, res) => {
     const query = req.query.q;
     try {
-        const response = await axios.get('https://www.reddit.com/search.json', {
-            params: { q: query }
+        const response = await axios.get(`https://www.reddit.com/search.json`, {
+            params: {
+                q: query
+            }
         });
-        const results = response.data.data.children.map((post) => ({
-            title: post.data.title,
-            url: `https://www.reddit.com${post.data.permalink}`,
-            ups: post.data.ups,
-            num_comments: post.data.num_comments,
-            created: post.data.created_utc
+
+        const results = await Promise.all(response.data.data.children.map(async (post) => {
+            const postData = post.data;
+            const topComments = await fetchRedditTopComments(postData.id);
+
+            return {
+                title: postData.title,
+                link: `https://www.reddit.com${postData.permalink}`,
+                summary: postData.selftext || 'No summary available.',
+                ups: postData.ups,
+                num_comments: postData.num_comments,
+                top_answers: topComments
+            };
         }));
+
         res.json(results);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching from Reddit' });
     }
 });
 
-// Endpoint to send email with search results
+// Function to fetch top comments from a Reddit post
+const fetchRedditTopComments = async (postId) => {
+    try {
+        const response = await axios.get(`https://www.reddit.com/comments/${postId}.json`);
+        const comments = response.data[1].data.children;
+        return comments.slice(0, 3).map(comment => comment.data.body); // Get top 3 comments
+    } catch (error) {
+        console.error('Error fetching Reddit comments:', error);
+        return [];
+    }
+};
+
 app.post('/api/send-email', async (req, res) => {
     const { email, results } = req.body;
 
@@ -61,30 +111,17 @@ app.post('/api/send-email', async (req, res) => {
         }
     });
 
-    const resultsHtml = results.map(result => `
-        <div style="margin-bottom: 20px;">
-            <h3>${result.title}</h3>
-            <p><strong>Link:</strong> <a href="${result.url}" target="_blank">${result.url}</a></p>
-            <p><strong>Upvotes:</strong> ${result.ups || 0} | <strong>Comments:</strong> ${result.num_comments || 0}</p>
-        </div>
-    `).join('');
-
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: email,
         subject: 'Code Quest Search Results',
-        html: `
-            <h2>Your Search Results</h2>
-            <div>${resultsHtml}</div>
-            <p>Thank you for using Code Quest!</p>
-        `
+        text: JSON.stringify(results, null, 2)
     };
 
     try {
         await transporter.sendMail(mailOptions);
         res.json({ message: 'Email sent successfully' });
     } catch (error) {
-        console.error('Error sending email:', error);
         res.status(500).json({ error: 'Error sending email' });
     }
 });
