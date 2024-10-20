@@ -11,6 +11,7 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static('public'));
 
+// Endpoint to fetch results from Stack Overflow
 app.get('/api/stackoverflow', async (req, res) => {
     const query = req.query.q;
     try {
@@ -28,21 +29,27 @@ app.get('/api/stackoverflow', async (req, res) => {
     }
 });
 
+// Endpoint to fetch results from Reddit
 app.get('/api/reddit', async (req, res) => {
     const query = req.query.q;
     try {
-        const response = await axios.get(`https://www.reddit.com/search.json`, {
-            params: {
-                q: query
-            }
+        const response = await axios.get('https://www.reddit.com/search.json', {
+            params: { q: query }
         });
-        const results = response.data.data.children.map((post) => post.data);
+        const results = response.data.data.children.map((post) => ({
+            title: post.data.title,
+            url: `https://www.reddit.com${post.data.permalink}`,
+            ups: post.data.ups,
+            num_comments: post.data.num_comments,
+            created: post.data.created_utc
+        }));
         res.json(results);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching from Reddit' });
     }
 });
 
+// Endpoint to send email with search results
 app.post('/api/send-email', async (req, res) => {
     const { email, results } = req.body;
 
@@ -54,22 +61,30 @@ app.post('/api/send-email', async (req, res) => {
         }
     });
 
+    const resultsHtml = results.map(result => `
+        <div style="margin-bottom: 20px;">
+            <h3>${result.title}</h3>
+            <p><strong>Link:</strong> <a href="${result.url}" target="_blank">${result.url}</a></p>
+            <p><strong>Upvotes:</strong> ${result.ups || 0} | <strong>Comments:</strong> ${result.num_comments || 0}</p>
+        </div>
+    `).join('');
+
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: email,
         subject: 'Code Quest Search Results',
-        text: JSON.stringify(results, null, 2)
+        html: `
+            <h2>Your Search Results</h2>
+            <div>${resultsHtml}</div>
+            <p>Thank you for using Code Quest!</p>
+        `
     };
 
     try {
         await transporter.sendMail(mailOptions);
-        alert('Sent mail successfully');
         res.json({ message: 'Email sent successfully' });
-        console.log("success!");
     } catch (error) {
-        alert('error: ' + error.message);
-        console.log("failure!");
-        console.log(error.message);
+        console.error('Error sending email:', error);
         res.status(500).json({ error: 'Error sending email' });
     }
 });
