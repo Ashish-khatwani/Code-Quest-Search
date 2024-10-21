@@ -4,7 +4,7 @@ const nodemailer = require('nodemailer');
 const cors = require('cors');
 require('dotenv').config();
 
-const cache = {}; // This object will hold your cached search results
+const cache = {};
 
 
 const app = express();
@@ -24,7 +24,7 @@ const fetchStackOverflowAnswers = async (questionId) => {
                 filter: '!9_bDE(fI5'
             }
         });
-        return response.data.items.map(answer => answer.body).slice(0, 3); // Get top 3 answers
+        return response.data.items.map(answer => answer.body).slice(0, 3);
     } catch (error) {
         console.error('Error fetching Stack Overflow answers:', error);
         return [];
@@ -34,14 +34,12 @@ const fetchStackOverflowAnswers = async (questionId) => {
 const fetchRedditTopComments = async (postId) => {
     try {
         const response = await axios.get(`https://www.reddit.com/comments/${postId}.json`);
-        // Check if response data exists and has the second element
         if (response.data && response.data[1] && response.data[1].data && response.data[1].data.children) {
             const comments = response.data[1].data.children;
             return comments.slice(0, 3).map(comment => {
                 const body = comment.data.body;
-                // Truncate comment to the first 300 characters or less
                 const truncatedBody = body.length > 300 ? body.slice(0, 300) + '...' : body;
-                return truncatedBody; // Return truncated comment
+                return truncatedBody;
             });
         } else {
             console.error('Unexpected Reddit API response structure:', response.data);
@@ -71,13 +69,14 @@ app.get('/api/stackoverflow', async (req, res) => {
                 title: item.title,
                 link: item.link,
                 summary: item.body || 'No summary available.',
-                ups: item.score, // Using score as upvotes
-                num_comments: item.answer_count, // Using answer_count as comments
+                ups: item.score,
+                num_comments: item.answer_count,
                 top_answers: topAnswers
             };
         }));
 
         res.json(results);
+        
     } catch (error) {
         res.status(500).json({ error: 'Error fetching from Stack Overflow' });
     }

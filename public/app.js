@@ -1,4 +1,3 @@
-// DOM elements
 const searchButton = document.getElementById('searchButton');
 const clearButton = document.getElementById('clearButton');
 const toggleFiltersButton = document.getElementById('toggleFilters');
@@ -7,10 +6,8 @@ const emailInput = document.getElementById('emailInput');
 const sendEmailButton = document.getElementById('sendEmailButton');
 const filterSortSection = document.getElementById('filterSortSection');
 
-// Memory cache for search results
 const cache = {};
 
-// Function to handle search
 searchButton.addEventListener('click', async () => {
     const query = document.getElementById('searchInput').value;
     const sourceFilter = document.getElementById('sourceFilter').value;
@@ -23,7 +20,6 @@ searchButton.addEventListener('click', async () => {
         return;
     }
 
-    // Check if results are already cached
 
 
     const cacheKey = `${query}|${sourceFilter}|${minUpvotes}|${minComments}|${sortCriteria}`;
@@ -32,7 +28,7 @@ searchButton.addEventListener('click', async () => {
         return res.json(cache[cacheKey].data);
     }
 
-    
+
     if (cache[cacheKey]) {
         console.log('Using cached results for:', cacheKey);
         displayResults(cache[cacheKey]);
@@ -40,29 +36,24 @@ searchButton.addEventListener('click', async () => {
     }
 
     try {
-        // Fetching results from Stack Overflow
         let stackOverflowResults = [];
         if (sourceFilter === 'all' || sourceFilter === 'stackoverflow') {
             const stackResponse = await fetch(`/api/stackoverflow?q=${query}`);
             stackOverflowResults = await stackResponse.json();
         }
 
-        // Fetching results from Reddit
         let redditResults = [];
         if (sourceFilter === 'all' || sourceFilter === 'reddit') {
             const redditResponse = await fetch(`/api/reddit?q=${query}`);
             redditResults = await redditResponse.json();
         }
 
-        // Combine results
         let results = [...stackOverflowResults, ...redditResults];
 
-        // Filter results based on upvotes and comments
         results = results.filter(result => {
             return (result.ups || 0) >= minUpvotes && (result.num_comments || 0) >= minComments;
         });
 
-        // Sort results based on selected criteria
         if (sortCriteria === 'date') {
             results.sort((a, b) => (b.created || 0) - (a.created || 0));
         } else if (sortCriteria === 'upvotes') {
@@ -71,10 +62,8 @@ searchButton.addEventListener('click', async () => {
             results.sort((a, b) => (b.num_comments || 0) - (a.num_comments || 0));
         }
 
-        // Cache the results
         cache[cacheKey] = results;
 
-        // Display results
         displayResults(results);
     } catch (error) {
         console.error('Error fetching results:', error);
@@ -82,9 +71,8 @@ searchButton.addEventListener('click', async () => {
     }
 });
 
-// Function to display results
 function displayResults(results) {
-    resultsContainer.innerHTML = ''; // Clear previous results
+    resultsContainer.innerHTML = '';
     if (results.length === 0) {
         resultsContainer.innerHTML = '<p class="placeholder-text">No results found.</p>';
         return;
@@ -95,17 +83,15 @@ function displayResults(results) {
         resultElement.classList.add('result-item');
 
         const title = result.title || 'No Title';
-        const url = result.link || result.url || ''; // URL for Stack Overflow or Reddit
-        const summary = result.summary || result.selftext || ''; // Summary for Reddit or additional data for Stack Overflow
-        const topAnswers = result.top_answers || []; // Top answers from Stack Overflow
+        const url = result.link || result.url || '';
+        const summary = result.summary || result.selftext || '';
+        const topAnswers = result.top_answers || [];
 
-        // Building result display
         resultElement.innerHTML = `
             <h3><a href="${url}" target="_blank">${title}</a></h3>
             <p>${summary}</p>
         `;
 
-        // Add Top Answers section if available
         if (topAnswers.length > 0) {
             resultElement.innerHTML += `<p><strong>Top Answers:</strong></p>
                 <ul>
@@ -113,7 +99,6 @@ function displayResults(results) {
                 </ul>`;
         }
 
-        // Append upvotes and comments info
         resultElement.innerHTML += `
             <p><strong>Upvotes:</strong> ${result.ups || 0} | <strong>Comments:</strong> ${result.num_comments || 0}</p>
         `;
@@ -121,11 +106,9 @@ function displayResults(results) {
         resultsContainer.appendChild(resultElement);
     });
 
-    // Show the email section
     document.getElementById('emailSection').style.display = 'block';
 }
 
-// Clear button functionality
 clearButton.addEventListener('click', () => {
     document.getElementById('searchInput').value = '';
     resultsContainer.innerHTML = '<p class="placeholder-text">Search results will appear here...</p>';
@@ -136,7 +119,6 @@ clearButton.addEventListener('click', () => {
     document.getElementById('sortCriteria').value = 'relevance';
 });
 
-// Toggle filters visibility
 toggleFiltersButton.addEventListener('click', () => {
     if (filterSortSection.style.display === 'none') {
         filterSortSection.style.display = 'block';
@@ -147,7 +129,6 @@ toggleFiltersButton.addEventListener('click', () => {
     }
 });
 
-// Send Email functionality
 sendEmailButton.addEventListener('click', async () => {
     const email = emailInput.value;
     const results = Array.from(resultsContainer.children).map(item => {
@@ -157,8 +138,8 @@ sendEmailButton.addEventListener('click', async () => {
         return {
             title: item.querySelector('h3').textContent,
             url: item.querySelector('a').href,
-            ups: upvotesMatch ? parseInt(upvotesMatch[1]) : 0,  // Default to 0 if no match
-            num_comments: commentsMatch ? parseInt(commentsMatch[1]) : 0,  // Default to 0 if no match
+            ups: upvotesMatch ? parseInt(upvotesMatch[1]) : 0,
+            num_comments: commentsMatch ? parseInt(commentsMatch[1]) : 0,
         };
     });
 
