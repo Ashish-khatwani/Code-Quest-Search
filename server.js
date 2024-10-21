@@ -4,6 +4,9 @@ const nodemailer = require('nodemailer');
 const cors = require('cors');
 require('dotenv').config();
 
+const cache = {}; // This object will hold your cached search results
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 

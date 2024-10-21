@@ -7,6 +7,9 @@ const emailInput = document.getElementById('emailInput');
 const sendEmailButton = document.getElementById('sendEmailButton');
 const filterSortSection = document.getElementById('filterSortSection');
 
+// Memory cache for search results
+const cache = {};
+
 // Function to handle search
 searchButton.addEventListener('click', async () => {
     const query = document.getElementById('searchInput').value;
@@ -17,6 +20,22 @@ searchButton.addEventListener('click', async () => {
 
     if (!query) {
         alert('Please enter a search query.');
+        return;
+    }
+
+    // Check if results are already cached
+
+
+    const cacheKey = `${query}|${sourceFilter}|${minUpvotes}|${minComments}|${sortCriteria}`;
+    if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp < 3600000)) { // 1 hour
+        console.log('Serving from cache:', cacheKey);
+        return res.json(cache[cacheKey].data);
+    }
+
+    
+    if (cache[cacheKey]) {
+        console.log('Using cached results for:', cacheKey);
+        displayResults(cache[cacheKey]);
         return;
     }
 
@@ -51,6 +70,9 @@ searchButton.addEventListener('click', async () => {
         } else if (sortCriteria === 'comments') {
             results.sort((a, b) => (b.num_comments || 0) - (a.num_comments || 0));
         }
+
+        // Cache the results
+        cache[cacheKey] = results;
 
         // Display results
         displayResults(results);
@@ -124,6 +146,7 @@ toggleFiltersButton.addEventListener('click', () => {
         toggleFiltersButton.textContent = 'Advanced Options';
     }
 });
+
 // Send Email functionality
 sendEmailButton.addEventListener('click', async () => {
     const email = emailInput.value;
